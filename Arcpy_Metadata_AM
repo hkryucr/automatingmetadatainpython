@@ -1,0 +1,86 @@
+#  In this python script, we will use ARCGIS2ISO19139gml321 translator
+
+# import necessary modules 
+# Sometimes, python3.5 is not compatialbe with Arcpy. In that case, you can just copy the entire code and paste it in arcpy embedded with ArcMap. 
+ 
+import arcpy
+import sys
+import os
+import csv, datetime, types, string, arcgisscripting
+
+# we will use ElementTree to manipulate XML files.
+
+from xml.etree.ElementTree import ElementTree
+from xml.etree.ElementTree import Element, SubElement
+
+# This one is to write a csv file - which will summarize the metada information we need. 
+
+Metadata_summary = open(r"C:/Users/Hyokyung Henry Ryu/Desktop/2018_Fall/ECB_GIS_Data_Management/Metadata_Cusco/1_Metadata_summary.csv", "w")
+ 
+# Necessary information we need to export from the metadata. 
+# ECB need the following items: filename, title, abstract, category, keywords, purpose, data date, data quality statement, lineage, data provider type, data provider name, data provider contact, Supplemental Information, Constraints, Language, Maitenance Frequency
+Metadata_summary.write("Filename, Title, Abstract, Category, Keywords, Purpose, Data Date, Data Quality Statement, Lineage, Data Provider Type, Data Provider Name, Data Provider Contact, Data Provider URL, Supplemental Information, Constraints, Language, Maintenance, Frequency\n")
+ 
+arcpy.env.workspace = r"C:\Users\Hyokyung Henry Ryu\Desktop\2018_Fall\ECB_GIS_Data_Management\Cusco_Processed_Data\2017_Cusco_Processed.gdb"
+datasets = arcpy.ListDatasets(feature_type='feature')
+datasets = [''] + datasets if datasets is not None else []
+ 
+# Loop through all dataset in the database that I specified in the workspace.
+for ds in datasets:
+    for fc in arcpy.ListFeatureClasses(feature_dataset=ds):
+        path = os.path.join(arcpy.env.workspace, ds, fc)
+        print(fc)
+
+        # variables
+        translator = "C:\Program Files (x86)\ArcGIS\Desktop10.3\Metadata\Translator\ARCGIS2ISO19139gml321.xml"
+        output_xml = "C:/Users/Hyokyung Henry Ryu/Desktop/2018_Fall/ECB_GIS_Data_Management/Metadata_Cusco/" + fc + ".xml"
+ 
+        # Process: Export Metadata
+        arcpy.ExportMetadata_conversion(fc, translator, output_xml)
+
+        # read through xml 
+        def replace_in_config(old, new):
+            with open(output_xml, 'r') as f:
+                text = f.read()
+
+            with open(output_xml, 'w') as f:
+                f.write(text.replace(old, new))
+
+        replace_in_config('gco:', '_stripped')
+
+
+        # Get the element Tree object from the XML file. Will be access them using CSDGM XPath
+        # Get the element tree from the file name and not a file object
+        tree = ElementTree()
+        tree.parse(output_xml)
+        tree.getroot()
+        
+
+         # Get the element Tree object from the XML file. Will be access them using CSDGM XPath
+
+        title = tree.find("identificationInfo/MD_DataIdentification/citation/CI_Citation/title/_strippedCharacterString")
+
+        if title is not None:
+            print ("Title = " + title.text) 
+            title = title.text
+            title = title.replace(",", " ")
+        else:
+            title = "None"
+            print ("Title = None")
+
+        abstract = tree.find("identificationInfo/MD_DataIdentification/abstract/_strippedCharacterString")
+
+        if abstract is not None:
+            print("Abstract" + abstract.text)
+            abstract = abstract.text
+            abstract = abstract.replace(",", " ")
+        else:
+            abstract = "None"
+            print ("Abstract = None")
+        # Open up summary file. Will be open the entire time.
+        Metadata_summary.write(fc + "," + title + "," +  abstract + "\n")
+
+# Close the summary file
+Metadata_summary.close()
+
+ 
